@@ -1,0 +1,47 @@
+# Real-world scenario: ONE partner SFTP server, TWO directories
+#
+#   /inbound/  : daily operational files (policies + claims)  PGP encrypted
+#   /reports/  : daily financial files  (premiums + reinsurance) plain CSV
+#
+# Adding a third directory later = add one block here. Zero code changes.
+
+
+sftp_directories:
+
+  # Directory 1
+  - dir_id:     inbound
+    label:      "Operational files (policies + claims)"
+    remote_dir: /inbound/
+    use_pgp:    true          # files are .gpg encrypted
+    use_checksum: true        # partner provides .sha256 sidecars
+    gcs_prefix: bronze/inbound
+    state_key:  sftp/inbound  # GCS state path: _state/sftp/inbound/processed_files.json
+    files:
+      - entity:   policies
+        pattern:  "policies_%Y%m%d.csv.gpg"
+        checksum: "policies_%Y%m%d.csv.sha256"
+        schema:   policies
+
+      - entity:   claims
+        pattern:  "claims_%Y%m%d.csv.gpg"
+        checksum: "claims_%Y%m%d.csv.sha256"
+        schema:   claims
+
+  # Directory 2
+  - dir_id:     reports
+    label:      "Financial reports (premiums + reinsurance)"
+    remote_dir: /reports/
+    use_pgp:    false         # plain CSV — no encryption
+    use_checksum: false       # no checksums for this directory
+    gcs_prefix: bronze/reports
+    state_key:  sftp/reports  # GCS state path: _state/sftp/reports/processed_files.json
+    files:
+      - entity:   premiums
+        pattern:  "premiums_%Y%m%d.csv"
+        checksum: ""
+        schema:   premiums
+
+      - entity:   reinsurance
+        pattern:  "reinsurance_%Y%m%d.csv"
+        checksum: ""
+        schema:   reinsurance

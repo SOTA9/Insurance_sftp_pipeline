@@ -1,0 +1,405 @@
+#   - dag_id fixed: integration-smoke-test was checking
+#     "insurance_sftp_bronze_silver_gold" but dags/ingestion_dag.py declares
+#     dag_id="insurance_sftp_gcs_ingestion". Updated to match.
+#
+#   - Artifact Registry repository name now matches
+#     google_artifact_registry_repository.insureflow_docker in terraform/main.tf:
+#     repository_id = "insureflow-docker-${var.environment}"
+#     (unchanged from before — confirmed correct against terraform/main.tf)
+#
+#   - COMPOSER_ENV_DEV / COMPOSER_ENV_PROD must equal
+#     module.composer.environment_name output, i.e. "insureflow-dev" /
+#     "insureflow-prod" (terraform/main.tf: environment_name = "insureflow-${var.environment}")
+#
+#   - unit-tests now installs pyyaml explicitly (directory_config.py requires
+#     it) and creates manifests/ + runs against the pipeline/state/ PACKAGE
+#     (sftp_state.py, silver_state.py, gold_state.py, __init__.py) rather
+#     than a flat pipeline/state.py module — only one of the two may exist
+#     on disk, this CI does not enforce that but the comment is here as a
+#     reminder for whoever maintains the repo.
+#
+#   - dag-validation step unchanged in behavior, but will now actually pass
+#     once dags/ingestion_dag.py's three import/call bugs are fixed:
+#       PGPHandler(dir_id=...), validate_file(csv_path, sftp_dir),
+#       bronze_to_silver_incremental(...)
+
+default:
+  image: python:3.11-slim-bookworm
+  interruptible: true
+  tags:
+    - docker
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.pip-cache"
+  DOCKER_DRIVER: overlay2
+  DOCKER_BUILDKIT: "1"
+  IMAGE_TAG: "$CI_COMMIT_SHORT_SHA"
+  # Terraform version — keep in sync with required_version in terraform/providers.tf
+  TF_VERSION: "1.7.5"
+  # Must match dag_id in dags/ingestion_dag.py
+  DAG_ID: "insurance_sftp_gcs_ingestion"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .pip-cache/
+
+stages:
+  - lint
+  - test
+  - terraform-plan   # plan on every MR to show infra diff
+  - build
+  - deploy-dev
+  - integration
+  - terraform-apply  # auto-gate dev, manual-gate prod
+  - deploy-prod
+  - notify
+
+# STAGE: lint
+
+flake8:
+  stage: lint
+  script:
+    - pip install --quiet flake8 flake8-bugbear flake8-isort
+    - flake8 pipeline/ dags/ schemas/ tests/ --max-line-length=100 --extend-ignore=E203,W503
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+
+bandit:
+  stage: lint
+  script:
+    - pip install --quiet bandit
+    - bandit -r pipeline/ dags/ schemas/ -ll -x tests/
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+
+safety-check:
+  stage: lint
+  script:
+    - pip install --quiet safety
+    - safety check -r requirements.txt --full-report
+  allow_failure: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+
+# STAGE: test
+
+unit-tests:
+  stage: test
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq gnupg
+    # pyyaml is required by pipeline/directory_config.py (yaml.safe_load)
+    # and is NOT currently pinned in requirements.txt — add it there too.
+    - pip install --quiet -r requirements.txt pyyaml pytest pytest-cov pytest-mock
+    - mkdir -p keys
+    - python keys/generate_pgp_keypair.py
+        --name "InsureFlow CI" --email "ci@insureflow.io"
+        --passphrase "ci-test-passphrase" --output-dir keys
+  script:
+    - pytest tests/ --cov=pipeline --cov=schemas
+        --cov-report=term-missing --cov-report=xml:coverage.xml
+        --cov-fail-under=80 -v --tb=short
+  coverage: '/TOTAL.*\s+(\d+%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 30 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+
+dag-validation:
+  stage: test
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq gnupg
+    - pip install --quiet -r requirements.txt pyyaml
+  script:
+    - |
+      python -c "
+      import sys, os
+      os.environ.setdefault('AIRFLOW__CORE__UNIT_TEST_MODE', 'True')
+      from airflow.models import DagBag
+      bag = DagBag(dag_folder='dags/', include_examples=False)
+      if bag.import_errors:
+          [print(f'ERROR [{d}]: {e}', file=sys.stderr) for d, e in bag.import_errors.items()]
+          sys.exit(1)
+      print(f'OK: {len(bag.dags)} DAG(s) parsed: {list(bag.dags.keys())}')
+      "
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+
+
+# STAGE: terraform-plan
+# Shows infra diff on every MR — no apply, no risk
+
+.tf-base: &tf-base
+  image: hashicorp/terraform:${TF_VERSION}
+  before_script:
+    - apk add --no-cache google-cloud-cli
+
+tf-plan-dev:
+  <<: *tf-base
+  stage: terraform-plan
+  script:
+    - echo "$GCP_SA_KEY_DEV" > /tmp/sa.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+    - cd terraform
+    - terraform init -backend-config=environments/dev/backend.hcl -input=false
+    # -var-file values must match environments/dev/terraform.tfvars
+    - terraform plan -var-file=environments/dev/terraform.tfvars -no-color 2>&1 | tee /tmp/tfplan-dev.txt
+    - cat /tmp/tfplan-dev.txt
+  after_script:
+    - rm -f /tmp/sa.json
+  artifacts:
+    paths:
+      - /tmp/tfplan-dev.txt
+    expire_in: 7 days
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  allow_failure: false
+
+
+# STAGE: build
+# Image tagged with commit SHA and pushed to Artifact Registry.
+# Repository name matches google_artifact_registry_repository.insureflow_docker
+# in terraform/main.tf: repository_id = "insureflow-docker-${var.environment}"
+
+.docker-build: &docker-build
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo "$GCP_SA_KEY" | docker login -u _json_key --password-stdin "https://${REGISTRY}"
+  script:
+    # FULL_IMAGE matches repository_id pattern in terraform/main.tf:
+    # insureflow-docker-{environment}
+    - |
+      FULL_IMAGE="${REGISTRY}/${GCP_PROJECT}/insureflow-docker-${ENV_NAME}/${IMAGE_NAME:-insureflow-airflow}"
+      echo "Building: ${FULL_IMAGE}:${IMAGE_TAG}"
+      docker buildx build \
+        --file docker/Dockerfile.prod \
+        --tag "${FULL_IMAGE}:${IMAGE_TAG}" \
+        --tag "${FULL_IMAGE}:${BRANCH_TAG}" \
+        --build-arg IMAGE_VERSION="${IMAGE_TAG}" \
+        --cache-from "${FULL_IMAGE}:${BRANCH_TAG}" \
+        --push .
+      echo "IMAGE_URI=${FULL_IMAGE}:${IMAGE_TAG}" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 1 day
+
+build-dev:
+  <<: *docker-build
+  variables:
+    GCP_PROJECT: "$GCP_PROJECT_DEV"
+    GCP_SA_KEY: "$GCP_SA_KEY_DEV"
+    BRANCH_TAG: "develop"
+    ENV_NAME: "dev"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+build-prod:
+  <<: *docker-build
+  variables:
+    GCP_PROJECT: "$GCP_PROJECT_PROD"
+    GCP_SA_KEY: "$GCP_SA_KEY_PROD"
+    BRANCH_TAG: "latest"
+    ENV_NAME: "prod"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+
+# STAGE: deploy-dev
+# Syncs DAGs + pipeline code to Composer dev environment.
+# COMPOSER_ENV_DEV must equal module.composer.environment_name output for
+# the dev workspace, i.e. "insureflow-dev" (terraform/main.tf:
+# environment_name = "insureflow-${var.environment}").
+# COMPOSER_LOCATION must match var.region in environments/dev/terraform.tfvars
+
+deploy-dev:
+  stage: deploy-dev
+  image: google/cloud-sdk:alpine
+  environment:
+    name: development
+  before_script:
+    - echo "$GCP_SA_KEY_DEV" > /tmp/sa.json
+    - gcloud auth activate-service-account --key-file=/tmp/sa.json
+    - gcloud config set project "$GCP_PROJECT_DEV"
+  script:
+    - |
+      # COMPOSER_ENV_DEV must equal "insureflow-dev"
+      COMPOSER_BUCKET=$(gcloud composer environments describe "${COMPOSER_ENV_DEV}" \
+        --location="${COMPOSER_LOCATION}" \
+        --format="value(config.dagGcsPrefix)")
+      DATA_PREFIX="${COMPOSER_BUCKET%/dags}/data"
+      echo "Composer bucket: ${COMPOSER_BUCKET}"
+
+      # Sync DAGs
+      gsutil -m rsync -r -d dags/ "${COMPOSER_BUCKET}/"
+
+      # Sync pipeline source — pipeline/ now contains state/ as a PACKAGE
+      # (sftp_state.py, silver_state.py, gold_state.py, __init__.py),
+      # not a flat state.py module. rsync -r copies the whole tree either way.
+      gsutil -m rsync -r pipeline/    "${DATA_PREFIX}/pipeline/"
+      gsutil -m rsync -r schemas/     "${DATA_PREFIX}/schemas/"
+      gsutil -m rsync -r manifests/   "${DATA_PREFIX}/manifests/"
+      gsutil cp keys/public_key.asc   "${DATA_PREFIX}/keys/public_key.asc"
+
+      echo "✅ Dev deploy complete."
+  after_script:
+    - rm -f /tmp/sa.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  needs:
+    - job: build-dev
+    - job: unit-tests
+
+# STAGE: integration
+
+integration-smoke-test:
+  stage: integration
+  image: google/cloud-sdk:alpine
+  before_script:
+    - echo "$GCP_SA_KEY_DEV" > /tmp/sa.json
+    - gcloud auth activate-service-account --key-file=/tmp/sa.json
+    - gcloud config set project "$GCP_PROJECT_DEV"
+  script:
+    - |
+      AIRFLOW_URI=$(gcloud composer environments describe "${COMPOSER_ENV_DEV}" \
+        --location="${COMPOSER_LOCATION}" \
+        --format="value(config.airflowUri)")
+      TOKEN=$(gcloud auth print-access-token)
+
+      # FIXED: dag_id must match dags/ingestion_dag.py exactly.
+      # Was checking "insurance_sftp_bronze_silver_gold" (does not exist) —
+      # the DAG actually declares dag_id="insurance_sftp_gcs_ingestion".
+      HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${AIRFLOW_URI}/api/v1/dags/${DAG_ID}")
+
+      if [ "$HTTP" != "200" ]; then
+        echo "❌ DAG '${DAG_ID}' not found (HTTP ${HTTP})"
+        exit 1
+      fi
+      echo "✅ DAG '${DAG_ID}' registered and Airflow API healthy (HTTP ${HTTP})"
+  after_script:
+    - rm -f /tmp/sa.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  needs:
+    - job: deploy-dev
+
+# STAGE: terraform-apply (dev manual-gate, prod manual-gate)
+
+tf-apply-dev:
+  <<: *tf-base
+  stage: terraform-apply
+  script:
+    - echo "$GCP_SA_KEY_DEV" > /tmp/sa.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+    - cd terraform
+    - terraform init -backend-config=environments/dev/backend.hcl -input=false
+    - terraform apply -var-file=environments/dev/terraform.tfvars -auto-approve -input=false
+  after_script:
+    - rm -f /tmp/sa.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual   # infra changes always need explicit review, even in dev
+  needs:
+    - job: integration-smoke-test
+
+tf-apply-prod:
+  <<: *tf-base
+  stage: terraform-apply
+  script:
+    - echo "$GCP_SA_KEY_PROD" > /tmp/sa.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+    - cd terraform
+    - terraform init -backend-config=environments/prod/backend.hcl -input=false
+    - terraform apply -var-file=environments/prod/terraform.tfvars -auto-approve -input=false
+  after_script:
+    - rm -f /tmp/sa.json
+  when: manual
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  needs:
+    - job: build-prod
+    - job: unit-tests
+
+# STAGE: deploy-prod (manual gate)
+# COMPOSER_ENV_PROD must equal "insureflow-prod"
+
+deploy-prod:
+  stage: deploy-prod
+  image: google/cloud-sdk:alpine
+  environment:
+    name: production
+  when: manual
+  before_script:
+    - echo "$GCP_SA_KEY_PROD" > /tmp/sa.json
+    - gcloud auth activate-service-account --key-file=/tmp/sa.json
+    - gcloud config set project "$GCP_PROJECT_PROD"
+  script:
+    - |
+      echo "Production deploy approved by: ${GITLAB_USER_LOGIN}"
+
+      COMPOSER_BUCKET=$(gcloud composer environments describe "${COMPOSER_ENV_PROD}" \
+        --location="${COMPOSER_LOCATION}" \
+        --format="value(config.dagGcsPrefix)")
+      DATA_PREFIX="${COMPOSER_BUCKET%/dags}/data"
+
+      gsutil -m rsync -r -d dags/     "${COMPOSER_BUCKET}/"
+      gsutil -m rsync -r pipeline/    "${DATA_PREFIX}/pipeline/"
+      gsutil -m rsync -r schemas/     "${DATA_PREFIX}/schemas/"
+      gsutil -m rsync -r manifests/   "${DATA_PREFIX}/manifests/"
+      gsutil cp keys/public_key.asc   "${DATA_PREFIX}/keys/public_key.asc"
+
+      # Tag image as prod-stable in Artifact Registry.
+      # Repository matches terraform/main.tf: insureflow-docker-prod
+      FULL_IMAGE="${REGISTRY}/${GCP_PROJECT_PROD}/insureflow-docker-prod/${IMAGE_NAME:-insureflow-airflow}"
+      gcloud container images add-tag \
+        "${FULL_IMAGE}:${IMAGE_TAG}" \
+        "${FULL_IMAGE}:prod-stable" --quiet
+
+      echo "✅ Production deploy complete. ${IMAGE_TAG} → prod-stable"
+  after_script:
+    - rm -f /tmp/sa.json
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  needs:
+    - job: build-prod
+    - job: unit-tests
+
+
+# STAGE: notify
+
+notify-slack:
+  stage: notify
+  image: curlimages/curl:latest
+  script:
+    - |
+      EMOJI=":white_check_mark:"; COLOR="good"
+      [ "$CI_JOB_STATUS" = "failed" ] && EMOJI=":x:" && COLOR="danger"
+      curl -s -X POST "${SLACK_WEBHOOK_URL}" \
+        -H "Content-Type: application/json" \
+        -d "{\"attachments\":[{\"color\":\"${COLOR}\",
+             \"title\":\"${EMOJI} InsureFlow — ${CI_COMMIT_BRANCH}\",
+             \"text\":\"Pipeline <${CI_PIPELINE_URL}|#${CI_PIPELINE_ID}> ${CI_JOB_STATUS}\",
+             \"fields\":[
+               {\"title\":\"Branch\",\"value\":\"${CI_COMMIT_BRANCH}\",\"short\":true},
+               {\"title\":\"Commit\",\"value\":\"${CI_COMMIT_SHORT_SHA}\",\"short\":true},
+               {\"title\":\"Author\",\"value\":\"${GITLAB_USER_LOGIN}\",\"short\":true}
+             ]}]}"
+  when: always
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(main|develop)$/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'

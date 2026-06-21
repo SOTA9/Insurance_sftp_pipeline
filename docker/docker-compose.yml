@@ -1,0 +1,126 @@
+version: "3.9"
+
+x-airflow-common: &airflow-common
+  image: "${REGISTRY}/${GCP_PROJECT}/insureflow-airflow:${IMAGE_TAG:-latest}"
+  restart: unless-stopped
+  entrypoint: ["/opt/airflow/docker/entrypoint.sh"]
+  environment:
+    # Airflow core
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:${POSTGRES_PASSWORD}@postgres:5432/airflow"
+    AIRFLOW__CORE__FERNET_KEY: "${AIRFLOW_FERNET_KEY}"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__WEBSERVER__SECRET_KEY: "${AIRFLOW_WEBSERVER_SECRET_KEY}"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "True"
+    AIRFLOW__CORE__MAX_ACTIVE_RUNS_PER_DAG: "1"
+    AIRFLOW__SCHEDULER__CATCHUP_BY_DEFAULT: "False"
+
+    # Secret Manager backend
+    AIRFLOW__SECRETS__BACKEND: "airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend"
+    AIRFLOW__SECRETS__BACKEND_KWARGS: >-
+      {"project_id": "${GCP_PROJECT}",
+       "connections_prefix": "airflow-connections",
+       "variables_prefix": "airflow-variables",
+       "sep": "-"}
+
+    # Pipeline env vars — match env_variables in modules/composer/main.tf
+    GCS_PROJECT: "${GCP_PROJECT}"
+    GCS_BUCKET: "${GCS_BUCKET}"
+    BQ_DATASET: "pipeline_audit"
+    BQ_TABLE: "ingestion_runs"
+    BQ_GOLD_DATASET: "gold_insurance"
+    EXPECTED_FILES_MANIFEST: "manifests/expected_files.json"
+    CHECKSUM_EXTENSION: ".sha256"
+    MAX_MISSING_FILES_ALLOWED: "0"
+    ENVIRONMENT: "${ENVIRONMENT:-prod}"
+    PGP_GNUPGHOME: "/tmp/gnupg"
+
+    # Tells entrypoint.sh and directory_config.py where to find directory defs
+    SFTP_DIRECTORIES_YAML: "/opt/airflow/manifests/sftp_directories.yaml"
+
+    # NOTE: SFTP_REMOTE_DIR is REMOVED — no longer a single path.
+    # Remote directories are defined in sftp_directories.yaml.
+
+    # GCP auth
+    GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+
+  volumes:
+    - airflow-logs:/opt/airflow/logs
+    # In production, remove this mount and rely on the baked-in copy.
+    - ./manifests:/opt/airflow/manifests:ro
+
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks:
+    - insureflow-net
+
+services:
+  # Metadata database
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - insureflow-net
+
+  # DB init
+  airflow-init:
+    <<: *airflow-common
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow users create
+          --username admin --firstname InsureFlow --lastname Admin
+          --role Admin --email admin@insureflow.io
+          --password '${AIRFLOW_ADMIN_PASSWORD}' || true
+      "
+    restart: "no"
+
+  # Webserver
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  # Scheduler
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "airflow", "jobs", "check", "--job-type", "SchedulerJob",
+             "--hostname", "$${HOSTNAME}"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  postgres-data:
+  airflow-logs:
+
+networks:
+  insureflow-net:
+    driver: bridge
