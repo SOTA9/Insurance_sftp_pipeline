@@ -1,45 +1,3 @@
-"""
-Incremental ingestion state for SFTP downloads.
-
-Tracks which filenames have already been downloaded and successfully
-landed in GCS bronze. Persisted as a JSON file in GCS so it survives
-DAG restarts, Airflow worker restarts, and redeployments.
-
-State file location per directory:
-  gs://{bucket}/_state/{state_key}/processed_files.json
-
-  e.g.
-    gs://insureflow-datalake-prod/_state/sftp/inbound/processed_files.json
-    gs://insureflow-datalake-prod/_state/sftp/reports/processed_files.json
-
-State file format:
-  {
-    "dir_id": "inbound",
-    "last_updated": "2026-05-16T07:42:11Z",
-    "processed_files": {
-      "policies_20260514.csv.gpg": {
-        "processed_at":   "2026-05-14T07:38:02Z",
-        "business_date":  "2026-05-14",
-        "gcs_bronze_uri": "gs://bucket/bronze/inbound/policies/year=2026/.../policies_20260514.csv"
-      },
-      "policies_20260515.csv.gpg": { ... },
-      "claims_20260514.csv.gpg":   { ... }
-    }
-  }
-
-First run behaviour:
-  State file does not exist → _load() returns empty dict →
-  get_new_files(sftp_listing) returns ALL files → full load.
-
-Subsequent run behaviour:
-  State file exists → get_new_files() returns only filenames
-  NOT already in processed_files → incremental load.
-
-Retry safety:
-  State is only written AFTER successful GCS upload.
-  If upload fails, the file is NOT in state → next retry re-downloads it.
-  This guarantees at-least-once delivery with no silent data loss.
-"""
 from __future__ import annotations
 
 import json
@@ -56,13 +14,6 @@ _STATE_ROOT = "_state"
 class SFTPState:
     """
     Manages incremental load state for one SFTP directory.
-
-    Usage:
-        state = SFTPState(gcs_bucket="...", state_key="sftp/inbound", ...)
-        new_files = state.get_new_files(sftp_listing)
-        # ... download and upload new_files to GCS ...
-        state.mark_processed(filename, business_date, gcs_uri)
-        state.save()   # ← must call after successful upload
     """
 
     def __init__(
@@ -80,7 +31,6 @@ class SFTPState:
         self._bucket = self._client.bucket(gcs_bucket)
         self._data: dict = self._load()
 
-    # Private
 
     @staticmethod
     def _make_client(project: str, sa_key_path: Optional[Path]):
@@ -217,13 +167,13 @@ class SFTPState:
         )
         total = len(self._data.get("processed_files", {}))
         logger.info(
-            "[state/%s] Saved → gs://%s/%s (%d total files recorded).",
+            "[state/%s] Saved -> gs://%s/%s (%d total files recorded).",
             self.state_key, self.gcs_bucket, self._blob_name, total,
         )
 
     def reset(self) -> None:
         """
-        Clear state → triggers a full reload on the next DAG run.
+        Clear state -> triggers a full reload on the next DAG run.
         Use when you need to reprocess all files (e.g. bronze partition deleted,
         schema fix that requires re-landing all files).
         """

@@ -1,15 +1,3 @@
-#   1. make_directory_group() factory creates one TaskGroup per SFTP directory
-#      (inbound + reports). Groups run IN PARALLEL.
-#   2. check_and_diff task loads SFTPState and returns ONLY new files.
-#      First run = all files. Later runs = delta only.
-#   3. decrypt task calls pgp_handler.process_directory() which handles
-#      both use_pgp=True (inbound) and use_pgp=False (reports) internally.
-#   4. checksum task calls validate_directory() which skips when use_checksum=False.
-#   5. upload_bronze task commits SFTPState AFTER successful GCS upload.
-#   6. transform_to_silver task loads SilverState per entity — skips done dates.
-#   7. load_to_gold task loads GoldState per fact table — DELETE+INSERT per date.
-#   8. Dimensions + aggregates always WRITE_TRUNCATE (no state needed).
-
 from __future__ import annotations
 
 import logging

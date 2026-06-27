@@ -41,12 +41,9 @@ def write_audit(
 
     rows = []
     for uri, stat in zip(gcs_uris, stats):
-        # Extract dir_id from GCS URI path if not explicitly provided
-        # Pattern: gs://bucket/bronze/{dir_id}/{entity}/year=.../...
         inferred_dir_id = dir_id
         if inferred_dir_id is None:
             parts = uri.replace("gs://", "").split("/")
-            # parts[0]=bucket, parts[1]=bronze, parts[2]=dir_id
             if len(parts) >= 3 and parts[1] == "bronze":
                 inferred_dir_id = parts[2]
 

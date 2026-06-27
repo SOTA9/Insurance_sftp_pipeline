@@ -1,27 +1,3 @@
-#   1. __init__ now accepts optional dir_id parameter.
-#      When dir_id is provided, the handler uses:
-#        - Isolated GPG home: /tmp/gnupg/{dir_id}/  (no keyring pollution)
-#        - Per-directory private key: get_dir_pgp_key_path(dir_id)
-#        - Per-directory passphrase:  get_dir_pgp_passphrase(dir_id)
-#      When dir_id is None (backward compat), falls back to global settings.
-#
-#   2. process_directory() is NEW — this is the main entry point used by
-#      the DAG decrypt task. It handles BOTH directory types:
-#        use_pgp=True  (/inbound/)  → decrypt .gpg files
-#        use_pgp=False (/reports/)  → copy plain CSV files as-is
-#      The decrypt task in the DAG calls this one method and the handler
-#      decides what to do internally based on use_pgp flag.
-#
-#   3. decrypt_file() and decrypt_batch() — unchanged logic, but now use
-#      the per-directory passphrase and key loaded in __init__.
-#
-#   4. encrypt_file() — unchanged, used only by tests to create .gpg fixtures.
-#
-#   5. cleanup_gpg_home() — now removes /tmp/gnupg/{dir_id}/ specifically
-#      rather than the whole /tmp/gnupg/ base directory. This prevents one
-#      directory's cleanup from destroying another directory's keyring when
-#      both groups run in parallel.
-
 from __future__ import annotations
 
 import gnupg

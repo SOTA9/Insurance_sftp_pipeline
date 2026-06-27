@@ -1,27 +1,3 @@
-#   1. --dir-id argument added.
-#      Original: generates ONE global key pair used by all files.
-#      New: can generate a key pair SCOPED to one SFTP directory.
-#
-#      When --dir-id inbound:
-#        Public key  → keys/inbound_public_key.asc   (commit to repo)
-#        Private key → /tmp/inbound_private_key.asc  (load to Secret Manager)
-#        Secret name → inbound-pgp-private-key
-#        Passphrase  → inbound-pgp-passphrase
-#
-#      When --dir-id not provided:
-#        Same as original — generates global keys/public_key.asc
-#        Backward compatible.
-#
-#   2. --generate-all flag added.
-#      Reads manifests/sftp_directories.yaml and generates one key pair
-#      per directory that has use_pgp=True. Single command to set up
-#      all encrypted directories at once.
-#
-#   3. Output instructions updated to show the exact gcloud commands
-#      needed to load keys into Secret Manager using the correct
-#      per-directory secret naming convention.
-#
-#   4. Key generation logic (GPG, RSA-4096, 2-year expiry) UNCHANGED.
 
 from __future__ import annotations
 

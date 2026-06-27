@@ -1,31 +1,3 @@
-"""
-Incremental load state for the Silver -> Gold (BigQuery) layer.
-
-Tracks which (table, date) combinations have already been loaded
-into BigQuery fact tables. Dimension and aggregate tables are always
-full-refresh so they do not need state tracking.
-
-State file location per fact table:
-  gs://{bucket}/_state/gold/{table_name}/loaded_dates.json
-
-  e.g.
-    gs://insureflow-datalake-prod/_state/gold/fact_premiums/loaded_dates.json
-    gs://insureflow-datalake-prod/_state/gold/fact_claims/loaded_dates.json
-    gs://insureflow-datalake-prod/_state/gold/fact_reinsurance/loaded_dates.json
-
-State file format:
-  {
-    "table": "fact_claims",
-    "last_updated": "2026-05-16T07:50:00Z",
-    "loaded_dates": ["2026-05-14", "2026-05-15", "2026-05-16"]
-  }
-
-Idempotency for facts:
-  Even if a date is already in state, force_reload=True triggers a
-  DELETE partition + re-INSERT. This handles reruns after a silver fix.
-
-Dimensions and aggregates: no state needed (WRITE_TRUNCATE is idempotent).
-"""
 from __future__ import annotations
 
 import json

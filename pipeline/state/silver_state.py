@@ -1,34 +1,3 @@
-# pipeline/state/silver_state.py
-"""
-Incremental transformation state for the Bronze → Silver layer.
-
-Tracks which (entity, date) combinations have already been transformed
-and written as Parquet to the silver GCS prefix.
-
-State file location per entity:
-  gs://{bucket}/_state/silver/{entity}/processed_dates.json
-
-  e.g.
-    gs://insureflow-datalake-prod/_state/silver/policies/processed_dates.json
-    gs://insureflow-datalake-prod/_state/silver/claims/processed_dates.json
-    gs://insureflow-datalake-prod/_state/silver/premiums/processed_dates.json
-    gs://insureflow-datalake-prod/_state/silver/reinsurance/processed_dates.json
-
-State file format:
-  {
-    "entity": "policies",
-    "last_updated": "2026-05-16T07:45:00Z",
-    "processed_dates": ["2026-05-14", "2026-05-15", "2026-05-16"]
-  }
-
-First run: state file missing → processed_dates is empty →
-  transform ALL available bronze dates for this entity.
-
-Subsequent runs: only dates NOT in processed_dates are transformed.
-
-force_reprocess=True: re-transform a date even if already in state.
-  Use when you fix a transformer bug and need to rewrite a silver file.
-"""
 from __future__ import annotations
 
 import json
