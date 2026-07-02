@@ -1,12 +1,3 @@
-#   One new column added: "dir_id" (nullable STRING, required=False)
-#
-#   Why: reinsurance files come from /reports/ directory (use_pgp=False).
-#   dir_id="reports" is stamped by the transformer so every row in BigQuery
-#   is traceable back to its SFTP source directory. Critical for incident
-#   response and data lineage audits.
-#
-#   All other column definitions IDENTICAL to original.
-
 import pandas as pd
 import pandera as pa
 from pandera import Column, DataFrameSchema, Check

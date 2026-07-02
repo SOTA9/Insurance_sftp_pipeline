@@ -1,9 +1,3 @@
-# pipeline/checksum_validator.py
-"""
-UPDATED: validate_directory() now accepts use_checksum flag.
-For directories with use_checksum=False (e.g. /reports/) the
-validation step is skipped entirely — no sidecar files to check.
-"""
 from __future__ import annotations
 
 import hashlib

@@ -12,32 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class PGPHandler:
-    """
-    Handles PGP key import, encryption, and decryption.
-
-    For multi-directory pipelines each encrypted directory gets its own
-    PGPHandler instance with an isolated GPG home to prevent keyring
-    contamination between parallel TaskGroups.
-
-    Usage:
-        # /inbound/ directory (use_pgp=True)
-        handler = PGPHandler(dir_id="inbound")
-        handler.process_directory(
-            use_pgp=True,
-            download_dir=Path("/tmp/dl_inbound/"),
-            decrypt_dir=Path("/tmp/dl_inbound/decrypted/"),
-            downloaded_files=["policies_20260514.csv.gpg", "claims_20260514.csv.gpg"],
-        )
-
-        # /reports/ directory (use_pgp=False)
-        handler = PGPHandler(dir_id="reports")
-        handler.process_directory(
-            use_pgp=False,   # copies files, no decryption
-            download_dir=Path("/tmp/dl_reports/"),
-            decrypt_dir=Path("/tmp/dl_reports/decrypted/"),
-            downloaded_files=["premiums_20260514.csv", "reinsurance_20260514.csv"],
-        )
-    """
 
     def __init__(self, dir_id: Optional[str] = None):
         """

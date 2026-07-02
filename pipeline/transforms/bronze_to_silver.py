@@ -1,29 +1,3 @@
-# pipeline/transforms/bronze_to_silver.py
-"""
-UPDATED — Bronze → Silver transformation with incremental loading.
-
-Changes from original:
-  1. Reads from directory-aware GCS bronze prefixes:
-       bronze/inbound/policies/year=.../...
-       bronze/reports/premiums/year=.../...
-     instead of the original single  insurance/policies/year=.../...
-
-  2. Uses SilverState to track which (entity, date) pairs have already
-     been transformed. Skips them on re-runs. Processes all on first run.
-
-  3. bronze_to_silver_incremental() — daily entry point called by the DAG.
-     bronze_to_silver_backfill()    — called once on first run to catch up
-                                      all historical bronze dates.
-
-  4. Cross-file deduplication: if multiple CSV files land for the same
-     entity+date (e.g. corrections), they are merged before writing Parquet.
-
-State files written:
-  gs://bucket/_state/silver/policies/processed_dates.json
-  gs://bucket/_state/silver/claims/processed_dates.json
-  gs://bucket/_state/silver/premiums/processed_dates.json
-  gs://bucket/_state/silver/reinsurance/processed_dates.json
-"""
 from __future__ import annotations
 
 import hashlib

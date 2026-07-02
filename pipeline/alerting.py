@@ -1,24 +1,3 @@
-#   1. notify_slack() — unchanged. Core function stays exactly the same.
-#
-#   2. on_failure_callback() — updated to extract dir_id from the failing
-#      task_id and include it in the Slack alert message.
-#
-#      Original message:
-#        "DAG: `insurance_sftp_gcs_ingestion` | Task: `check_inbound`"
-#
-#      New message (with dir_id extracted):
-#        "DAG: `...` | Task: `check_inbound` | Dir: `inbound`"
-#
-#      This is critical in production: when you get a 3am Slack alert you
-#      immediately know whether /inbound/ (operational files) or /reports/
-#      (financial files) is broken. Without dir_id you have to check the
-#      Airflow UI to find out which directory failed.
-#
-#   3. notify_directory_summary() — NEW helper called at end of each
-#      directory TaskGroup to post a per-directory success summary.
-#      Gives visibility into how many files each directory processed
-#      independently of the overall pipeline success notification.
-
 from __future__ import annotations
 
 import logging

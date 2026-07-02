@@ -1,16 +1,3 @@
-# pipeline/file_arrival_checker.py
-"""
-UPDATED: FileArrivalChecker now works with SFTPDirectory objects
-from directory_config.py instead of a flat JSON manifest.
-
-Key change:
-  Old: loaded expected_files.json with hardcoded filenames
-  New: receives an SFTPDirectory + business_date, resolves expected
-       filenames dynamically from the YAML patterns at runtime.
-
-This means adding a new entity in sftp_directories.yaml automatically
-updates what files are expected — no manifest JSON to maintain.
-"""
 from __future__ import annotations
 
 import logging
@@ -22,7 +9,6 @@ from pipeline.config import settings
 from pipeline.directory_config import SFTPDirectory
 
 logger = logging.getLogger(__name__)
-
 
 @dataclass
 class ArrivalReport:

@@ -56,15 +56,15 @@ def generate_keypair(
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Public key filename — scoped to dir_id or global
+        # Public key filename - scoped to dir_id or global
         pub_filename = f"{dir_id}_public_key.asc" if dir_id else "public_key.asc"
         pub_path     = output_dir / pub_filename
 
         pub_asc = gpg.export_keys(key.fingerprint, armor=True)
         pub_path.write_text(pub_asc)
-        print(f"{label} Public key  → {pub_path}  ✅ safe to commit")
+        print(f"{label} Public key - {pub_path}  safe to commit")
 
-        # Private key — always to /tmp, never to the repo
+        # Private key - always to /tmp, never to the repo
         priv_filename = f"{dir_id}_private_key.asc" if dir_id else "insureflow_private_key.asc"
         priv_path     = Path("/tmp") / priv_filename
 
@@ -73,7 +73,7 @@ def generate_keypair(
         )
         priv_path.write_text(priv_asc)
         priv_path.chmod(0o600)
-        print(f"{label} Private key → {priv_path}  ⚠  DO NOT COMMIT — load to Secret Manager")
+        print(f"{label} Private key → {priv_path}   DO NOT COMMIT — load to Secret Manager")
 
         # Write fingerprint for CI reference
         fp_filename = f"{dir_id}_fingerprint.txt" if dir_id else "fingerprint.txt"
@@ -137,7 +137,7 @@ Examples:
   # Generate key pairs for ALL use_pgp=True directories from YAML
   python keys/generate_pgp_keypair.py --generate-all
 
-  # CI usage — generate for inbound with CI passphrase
+  # CI usage - generate for inbound with CI passphrase
   python keys/generate_pgp_keypair.py \\
     --dir-id inbound \\
     --passphrase ci-test-passphrase \\

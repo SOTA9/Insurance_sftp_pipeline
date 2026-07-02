@@ -1,16 +1,3 @@
-#   One new column added: "dir_id" (nullable STRING)
-#
-#   Why: In the multi-directory setup, the same entity type (policies) could
-#   theoretically arrive from different directories. The dir_id column records
-#   which SFTP directory the file came from ("inbound" in this case) so that
-#   if data quality issues appear you can filter by source directory in BQ.
-#
-#   strict=False means extra columns are allowed, so adding dir_id in the
-#   transformer does not break validation. But we declare it here explicitly
-#   so Pandera validates it when present.
-#
-#   All other column definitions are IDENTICAL to the original.
-
 import pandas as pd
 import pandera as pa
 from pandera import Column, DataFrameSchema, Check

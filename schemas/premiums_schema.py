@@ -1,12 +1,3 @@
-#   One new column added: "dir_id" (nullable STRING, required=False)
-#
-#   Why: premiums files come from /reports/ directory (use_pgp=False).
-#   dir_id="reports" is stamped on every row by the transformer so you
-#   can trace in BigQuery exactly which SFTP directory produced this data.
-#   required=False means old files without this column still validate.
-#
-#   All other column definitions IDENTICAL to original.
-
 import pandas as pd
 import pandera as pa
 from pandera import Column, DataFrameSchema, Check

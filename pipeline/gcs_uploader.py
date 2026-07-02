@@ -1,11 +1,3 @@
-"""
-UPDATED: upload_for_directory() uses the gcs_prefix from SFTPDirectory config
-instead of building the path from a hardcoded domain string.
-
-Bronze paths now reflect the directory they came from:
-  /inbound/  - gs://bucket/bronze/inbound/policies/year=2026/month=05/day=14/
-  /reports/  - gs://bucket/bronze/reports/premiums/year=2026/month=05/day=14/
-"""
 from __future__ import annotations
 
 import logging

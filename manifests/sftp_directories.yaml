@@ -1,11 +1,3 @@
-# Real-world scenario: ONE partner SFTP server, TWO directories
-#
-#   /inbound/  : daily operational files (policies + claims)  PGP encrypted
-#   /reports/  : daily financial files  (premiums + reinsurance) plain CSV
-#
-# Adding a third directory later = add one block here. Zero code changes.
-
-
 sftp_directories:
 
   # Directory 1

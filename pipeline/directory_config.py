@@ -2,8 +2,6 @@
 Loads manifests/sftp_directories.yaml into typed SFTPDirectory objects.
 Used by: sftp_client, file_arrival_checker, pgp_handler, gcs_uploader,
          bronze_to_silver, silver_to_gold, DAG, and all tests.
-
-To add a third directory: add one YAML block. Nothing here changes.
 """
 from __future__ import annotations
 

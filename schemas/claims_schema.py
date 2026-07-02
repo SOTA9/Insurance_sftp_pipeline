@@ -1,5 +1,3 @@
-# dir_id column added (nullable, required=False)
-# All other columns IDENTICAL to original.
 import pandas as pd
 import pandera as pa
 from pandera import Column, DataFrameSchema, Check

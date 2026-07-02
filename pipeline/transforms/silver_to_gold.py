@@ -1,23 +1,3 @@
-"""
-  1. Reads silver Parquet from gs://bucket/silver/{entity}/year=.../...
-     (unchanged path — silver is entity-centric, not directory-centric)
-
-  2. Uses GoldState to track which (fact_table, date) partitions are
-     already loaded in BigQuery. Skips them on re-runs.
-
-  3. Fact tables use DELETE-partition + INSERT for idempotency:
-       - Delete WHERE ingestion_date = business_date
-       - INSERT new rows (WRITE_APPEND)
-     This means re-running for the same date is always safe.
-
-  4. Dimension tables: always WRITE_TRUNCATE (small, idempotent).
-  5. Aggregate tables: always WRITE_TRUNCATE (recomputed fresh each run).
-
-GoldState blob locations:
-  gs://bucket/_state/gold/fact_premiums/loaded_dates.json
-  gs://bucket/_state/gold/fact_claims/loaded_dates.json
-  gs://bucket/_state/gold/fact_reinsurance/loaded_dates.json
-"""
 from __future__ import annotations
 
 import logging
