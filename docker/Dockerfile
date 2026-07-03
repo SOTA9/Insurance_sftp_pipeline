@@ -1,19 +1,3 @@
-#   1. pyyaml added to builder pip install — directory_config.py uses yaml.safe_load()
-#      to read manifests/sftp_directories.yaml. Without this the import fails.
-#
-#   2. manifests/sftp_directories.yaml explicitly COPY'd into the image
-#      so entrypoint.sh can read it at startup to determine which directories
-#      need PGP secrets fetched from Secret Manager.
-#
-#   3. SFTP_REMOTE_DIR env var REMOVED — it was a single hardcoded path.
-#      Directory paths now come from sftp_directories.yaml at runtime.
-#
-#   4. SFTP_DIRECTORIES_YAML env var added so entrypoint.sh knows where
-#      the YAML file lives inside the container.
-#
-#   All other layers (non-root user, GPG, Workload Identity) unchanged.
-
-
 # Stage 1: dependency builder
 FROM python:3.11-slim-bookworm AS builder
 

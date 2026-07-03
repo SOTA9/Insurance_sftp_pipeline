@@ -1,7 +1,3 @@
-# Root module - wires gcs, secret_manager, bigquery, composer together.
-# Run per-environment from environments/dev or environments/prod, which each
-# call this root module with their own terraform.tfvars + backend.hcl.
-
 locals {
   common_labels = merge(var.labels, {
     app         = "insureflow"

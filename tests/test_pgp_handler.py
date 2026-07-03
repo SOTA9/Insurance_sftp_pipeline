@@ -1,14 +1,3 @@
-#   1. All tests now instantiate PGPHandler(dir_id="inbound") or
-#      PGPHandler(dir_id="reports") to mirror real usage.
-#   2. New test class TestProcessDirectory — covers the main DAG entry point:
-#        process_directory(use_pgp=True)  → /inbound/ path
-#        process_directory(use_pgp=False) → /reports/ path
-#   3. TestIsolatedGpgHome — new class verifying each dir_id gets its own
-#      GPG home so parallel TaskGroups don't interfere.
-#   4. TestCleanup updated — cleanup only removes {dir_id} subdir not all
-#      of /tmp/gnupg/ so parallel directories are not affected.
-#   5. Original encrypt/decrypt round-trip tests kept and extended.
-
 from __future__ import annotations
 
 import shutil

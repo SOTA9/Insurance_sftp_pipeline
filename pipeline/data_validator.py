@@ -1,31 +1,3 @@
-#   1. infer_file_type() now accepts an optional SFTPDirectory parameter.
-#
-#      Original: hardcoded dict matching filename prefix to schema key.
-#        SCHEMA_MAP = {"policies": ..., "claims": ..., ...}
-#        "policies_20260514.csv" → split prefix → lookup in SCHEMA_MAP
-#
-#      Problem: /reports/ directory has entities "premiums" and "reinsurance"
-#               which also exist in SCHEMA_MAP. If a file comes from /inbound/
-#               called "policies_20260514.csv" and one from /reports/ called
-#               "premiums_20260514.csv", both need to be matched correctly.
-#               The original function works fine here — BUT when we add a new
-#               directory with different file naming or new entity types,
-#               hardcoding breaks. Using SFTPDirectory.files gives us the
-#               mapping from filename pattern → schema key dynamically.
-#
-#      New: tries SFTPDirectory.files first (preferred), falls back to
-#           SCHEMA_MAP for backward compatibility.
-#
-#   2. validate_file() now accepts optional sftp_dir parameter and passes
-#      it to infer_file_type() so schema lookup uses directory context.
-#
-#   3. SCHEMA_MAP stays. It is the fallback and still used by tests that
-#      don't pass an sftp_dir.
-#
-#   4. All Pandera schemas (policies, claims, premiums, reinsurance)
-#      stay 100% IDENTICAL — the schema logic does not change.
-#      The schemas themselves do NOT change. See bottom of this file.
-
 from __future__ import annotations
 
 import logging
@@ -42,7 +14,7 @@ from schemas.reinsurance_schema import reinsurance_schema
 
 logger = logging.getLogger(__name__)
 
-# Schema map — keyed by entity name, same as sftp_directories.yaml entity values
+# Schema map - keyed by entity name, same as sftp_directories.yaml entity values
 SCHEMA_MAP = {
     "policies":    policies_schema,
     "claims":      claims_schema,
@@ -53,7 +25,7 @@ SCHEMA_MAP = {
 
 def infer_file_type(
     filename: str,
-    sftp_dir=None,   # Optional[SFTPDirectory] — avoids circular import
+    sftp_dir=None,   # Optional[SFTPDirectory]  avoids circular import
 ) -> str:
     """
     Determine the entity/schema key for a given filename.

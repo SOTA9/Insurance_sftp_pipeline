@@ -1,26 +1,3 @@
-#   1. mock_settings: SFTP_REMOTE_DIR removed, SFTP_DIRECTORIES_YAML added,
-#      BQ_GOLD_DATASET added, ENVIRONMENT set to "dev".
-#
-#   2. Two SFTPDirectory fixtures added:
-#        sftp_dir_inbound  — /inbound/ with use_pgp=True, use_checksum=True
-#        sftp_dir_reports  — /reports/ with use_pgp=False, use_checksum=False
-#      These are used by all tests that need directory context.
-#
-#   3. sample_data_dir updated: creates files matching BOTH directories
-#      so tests for /inbound/ get .gpg + .sha256 files and tests for
-#      /reports/ get plain .csv files.
-#
-#   4. mock_sftp_state fixture added: mocks SFTPState so incremental
-#      state tests don't need real GCS.
-#
-#   5. Patch targets updated to include all new modules:
-#        pipeline.directory_config.directory_config
-#        pipeline.state.SFTPState
-#        pipeline.state.SilverState
-#        pipeline.state.GoldState
-#
-#   6. PGP fixtures unchanged — still generate ephemeral RSA-2048 key pair.
-
 from __future__ import annotations
 
 import hashlib

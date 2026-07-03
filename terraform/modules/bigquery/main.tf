@@ -1,7 +1,7 @@
 # Two datasets:
-# 1. pipeline_audit.ingestion_runs — schema MUST match SCHEMA in
+# 1. pipeline_audit.ingestion_runs : schema MUST match SCHEMA in
 # pipeline/audit_logger.py exactly (including dir_id, gcs_prefix).
-# 2. gold_insurance — 3 dimension + 3 fact + 3 aggregate tables, written by
+# 2. gold_insurance : 3 dimension + 3 fact + 3 aggregate tables, written by
 # pipeline/transforms/silver_to_gold.py (TBL_DIM_*, TBL_FACT_*, TBL_AGG_*).
 # Gold table schemas are produced by pandas-gbq style load jobs with
 # schema autodetection from the silver Parquet/DataFrame, so they are

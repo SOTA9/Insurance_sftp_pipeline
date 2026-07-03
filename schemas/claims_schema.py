@@ -20,13 +20,13 @@ claims_schema = DataFrameSchema(
         "adjuster_id":   Column(str, nullable=True),
         "incident_date": Column(
             pa.DateTime, nullable=False,
-            checks=Check(lambda s: s >= pd.Timestamp("1990-01-01"),
-                         error="incident_date must be >= 1990-01-01"),
+            checks=Check(lambda s: s >= pd.Timestamp("2020-01-01"),
+                         error="incident_date must be >= 2020-01-01"),
         ),
         "reported_date": Column(
             pa.DateTime, nullable=False,
-            checks=Check(lambda s: s >= pd.Timestamp("1990-01-01"),
-                         error="reported_date must be >= 1990-01-01"),
+            checks=Check(lambda s: s >= pd.Timestamp("2020-01-01"),
+                         error="reported_date must be >= 2020-01-01"),
         ),
         "claim_type": Column(
             str,
@@ -61,7 +61,6 @@ claims_schema = DataFrameSchema(
             bool, nullable=True,
             description="True if flagged for potential fraud investigation",
         ),
-        # ADDED: SFTP source directory — "inbound" for claims
         "dir_id": Column(
             str, nullable=True, required=False,
             description="SFTP source directory e.g. 'inbound'",

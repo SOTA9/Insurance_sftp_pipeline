@@ -1,20 +1,3 @@
-#   1. on_failure_callback — includes dir_id in the Slack alert when
-#      the failing task belongs to a directory TaskGroup (ingest_inbound,
-#      ingest_reports). Without this you cannot tell which directory failed.
-#
-#   2. log_pipeline_banner — now accepts optional dir_id parameter so each
-#      TaskGroup logs its own banner identifying which directory it handles.
-#
-#   3. log_directory_summary() — new helper called at the start of each
-#      directory group to log what config was loaded for that directory
-#      (remote_dir, use_pgp, use_checksum, entities). Helps during debugging.
-#
-#   4. get_secret() — unchanged logic but docstring updated to reference
-#      the multi-directory secret naming convention where per-directory
-#      secrets follow the pattern {dir_id}-pgp-private-key.
-#
-#   5. on_sla_miss_callback — unchanged.
-
 from __future__ import annotations
 
 import logging

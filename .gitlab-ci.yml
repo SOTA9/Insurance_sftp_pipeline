@@ -1,28 +1,3 @@
-#   - dag_id fixed: integration-smoke-test was checking
-#     "insurance_sftp_bronze_silver_gold" but dags/ingestion_dag.py declares
-#     dag_id="insurance_sftp_gcs_ingestion". Updated to match.
-#
-#   - Artifact Registry repository name now matches
-#     google_artifact_registry_repository.insureflow_docker in terraform/main.tf:
-#     repository_id = "insureflow-docker-${var.environment}"
-#     (unchanged from before — confirmed correct against terraform/main.tf)
-#
-#   - COMPOSER_ENV_DEV / COMPOSER_ENV_PROD must equal
-#     module.composer.environment_name output, i.e. "insureflow-dev" /
-#     "insureflow-prod" (terraform/main.tf: environment_name = "insureflow-${var.environment}")
-#
-#   - unit-tests now installs pyyaml explicitly (directory_config.py requires
-#     it) and creates manifests/ + runs against the pipeline/state/ PACKAGE
-#     (sftp_state.py, silver_state.py, gold_state.py, __init__.py) rather
-#     than a flat pipeline/state.py module — only one of the two may exist
-#     on disk, this CI does not enforce that but the comment is here as a
-#     reminder for whoever maintains the repo.
-#
-#   - dag-validation step unchanged in behavior, but will now actually pass
-#     once dags/ingestion_dag.py's three import/call bugs are fixed:
-#       PGPHandler(dir_id=...), validate_file(csv_path, sftp_dir),
-#       bronze_to_silver_incremental(...)
-
 default:
   image: python:3.11-slim-bookworm
   interruptible: true

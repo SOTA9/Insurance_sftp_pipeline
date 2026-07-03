@@ -59,23 +59,10 @@ class GCSUploader:
         valid_csv_paths: list[Path],
         business_date: date,
     ) -> dict[str, str]:
-        """
-        Upload validated CSV files to GCS using the gcs_prefix
-        from the SFTPDirectory config.
 
-        Returns {filename: gcs_uri} for every uploaded file.
-
-        GCS path pattern:
-          {sftp_dir.gcs_prefix}/{entity}/year=YYYY/month=MM/day=DD/{filename}
-
-        Examples:
-          bronze/inbound/policies/year=2026/month=05/day=14/policies_20260514.csv
-          bronze/reports/premiums/year=2026/month=05/day=14/premiums_20260514.csv
-        """
         uris: dict[str, str] = {}
 
         for csv_path in valid_csv_paths:
-            # Determine entity from filename prefix
             entity = self._infer_entity(csv_path.name, sftp_dir)
             if not entity:
                 logger.warning(

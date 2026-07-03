@@ -97,9 +97,6 @@ premiums_schema = DataFrameSchema(
             ]),
             nullable=False,
         ),
-        # ADDED: records which SFTP directory produced this row
-        # premiums come from /reports/ (use_pgp=False directory)
-        # nullable=True + required=False for backward compatibility
         "dir_id": Column(
             str,
             nullable=True,

@@ -1,6 +1,3 @@
-# terraform/environments/prod/terraform.tfvars
-# Usage: terraform apply -var-file=environments/prod/terraform.tfvars
-
 project_id  = "insureflow-prod-project"
 region      = "us-central1"
 environment = "prod"

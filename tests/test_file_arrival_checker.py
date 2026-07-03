@@ -1,24 +1,3 @@
-#   1. FileArrivalChecker.check() no longer takes a manifest_path and
-#      a list of strings. It now takes an SFTPDirectory object and a
-#      business_date and resolves expected filenames from YAML patterns.
-#      ALL tests updated to reflect this new signature.
-#
-#   2. No more JSON manifest fixture — expected filenames come from the
-#      SFTPDirectory.all_expected_files(business_date) method which
-#      reads the YAML patterns at runtime.
-#
-#   3. Two separate test classes for the two directories:
-#        TestInboundArrivalCheck  — /inbound/ with PGP + checksums
-#        TestReportsArrivalCheck  — /reports/ plain CSV, no checksums
-#
-#   4. TestArrivalReport tests kept and extended with dir_id field.
-#
-#   5. TestMissingFilesRaise — confirms RuntimeError raised per-directory
-#      when required files are absent from that directory's listing.
-#
-#   6. TestUnexpectedFilesIgnored — extra files on SFTP are logged as
-#      unexpected but do NOT fail the check (same as original).
-
 from __future__ import annotations
 
 from datetime import date

@@ -1,29 +1,3 @@
-#   1. upload_batch() tests REMOVED — that method no longer exists.
-#      It is replaced by upload_for_directory() which takes an SFTPDirectory
-#      and builds GCS paths from the directory's gcs_prefix config.
-#
-#   2. build_gcs_prefix() tests REMOVED — that standalone function is gone.
-#      GCS prefix is now built inside GCSUploader.upload_for_directory()
-#      using SFTPDirectory.gcs_entity_prefix().
-#
-#   3. New class TestUploadForDirectory — main new test class covering:
-#        - /inbound/ files go to bronze/inbound/{entity}/year=.../...
-#        - /reports/ files go to bronze/reports/{entity}/year=.../...
-#        - entity is inferred from filename using sftp_dir.files entries
-#        - metadata tags include dir_id from sftp_dir
-#        - returns {filename: uri} dict
-#
-#   4. TestUploadDeadLetter updated — dead_letter paths now include dir_id:
-#      dead_letter/{dir_id}/{entity}/year=.../...
-#
-#   5. TestInferEntity — new class testing _infer_entity() which maps
-#      filenames to entity names using SFTPDirectory.files entries.
-#
-#   6. TestRetryLogic unchanged — retry on GoogleAPICallError still works
-#      the same way through upload_file() which is unchanged.
-#
-#   7. All GCS client calls remain mocked — no real GCP credentials needed.
-
 from __future__ import annotations
 
 from datetime import date

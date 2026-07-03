@@ -1,18 +1,3 @@
-#   1. infer_file_type() tests updated — now tested with AND without
-#      sftp_dir parameter to cover both code paths:
-#        - with sftp_dir → uses SFTPDirectory.files entries (preferred)
-#        - without sftp_dir → falls back to prefix matching (original)
-#   2. validate_file() tests updated — pass sftp_dir where relevant
-#      to reflect how the DAG validate task calls it.
-#   3. New TestInferFileTypeWithDirectory class — covers directory-aware
-#      entity lookup for both inbound (policies/claims) and reports
-#      (premiums/reinsurance).
-#   4. New TestDirIdInValidatedData — verifies that when dir_id column
-#      is present in a CSV it passes schema validation (nullable column
-#      added to all four schemas).
-#   5. All original schema rejection tests (bad IDs, invalid enums,
-#      negative amounts) kept 100% intact.
-
 from __future__ import annotations
 
 from pathlib import Path

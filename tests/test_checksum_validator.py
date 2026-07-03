@@ -1,11 +1,3 @@
-#   1. All calls now use validate_directory() instead of validate_batch()
-#      because validate_directory() is the new unified entry point that
-#      accepts the use_checksum flag from SFTPDirectory config.
-#   2. New test class TestUseChecksumFlag:
-#        use_checksum=True  (/inbound/) → validation runs
-#        use_checksum=False (/reports/) → validation skipped entirely
-#   3. Original compute_sha256 and validate_checksum unit tests kept.
-
 from __future__ import annotations
 
 import hashlib

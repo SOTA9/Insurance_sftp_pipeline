@@ -1,12 +1,3 @@
-#   1. All calls now pass remote_dir explicitly ("/inbound/" or "/reports/")
-#      instead of relying on settings.SFTP_REMOTE_DIR.
-#   2. New tests: visiting two directories in one session — confirms the
-#      client can list and download from both /inbound/ and /reports/ without
-#      reconnecting.
-#   3. New tests: directory namespacing — confirms files from /inbound/ and
-#      /reports/ are stored in separate subdirectories to avoid collisions.
-#   4. archive_remote_file tests updated — now pass remote_dir explicitly.
-
 from __future__ import annotations
 
 from pathlib import Path
