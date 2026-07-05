@@ -14,7 +14,7 @@ from pipeline.state import SilverState
 logger = logging.getLogger(__name__)
 
 SNAPPY = "snappy"
-SILVER_PREFIX = "silver"   # gs://bucket/silver/{entity}/year=.../...
+SILVER_PREFIX = "silver"
 
 
 # GCS helpers
@@ -38,7 +38,6 @@ def _list_bronze_dates_for_entity(bucket, entity: str) -> list[str]:
     dates: set[str] = set()
     # Scan every prefix that contains this entity
     for blob in bucket.list_blobs(prefix="bronze/"):
-        # blob.name example:
         #   bronze/inbound/policies/year=2026/month=05/day=14/policies_20260514.csv
         parts = blob.name.split("/")
         # We need: bronze / {dir} / {entity} / year=... / month=... / day=...
@@ -69,7 +68,7 @@ def _list_bronze_blobs_for_entity_date(
     month = business_date.month
     day   = business_date.day
 
-    # Scan bronze/ — matches both bronze/inbound/ and bronze/reports/
+    # Scan bronze/ - matches both bronze/inbound/ and bronze/reports/
     for blob in bucket.list_blobs(prefix="bronze/"):
         parts = blob.name.split("/")
         if len(parts) < 7:
@@ -321,8 +320,8 @@ def bronze_to_silver_incremental(
     Incremental behaviour:
       - Loads SilverState for this entity.
       - If business_date already in state AND force_reprocess=False → skip.
-      - Otherwise: read all bronze CSVs for entity+date → transform →
-        deduplicate across files → write Parquet → update state.
+      - Otherwise: read all bronze CSVs for entity+date -> transform ->
+        deduplicate across files -> write Parquet -> update state.
 
     Returns:
       GCS URI of written Parquet, or None if skipped.

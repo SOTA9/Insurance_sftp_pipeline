@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 SILVER_PREFIX = "silver"
 
-# BQ table names — must match table_id values in terraform/modules/bigquery/main.tf
+# BQ table names: must match table_id values in terraform/modules/bigquery/main.tf
 TBL_DIM_POLICY       = "dim_policy"
 TBL_DIM_CLAIMANT     = "dim_claimant"
 TBL_DIM_REINSURER    = "dim_reinsurer"
