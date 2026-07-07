@@ -1,22 +1,4 @@
 #!/usr/bin/env bash
-#   1. SFTP_REMOTE_DIR env var REMOVED : remote directories are now driven
-#      by manifests/sftp_directories.yaml, not a single env variable.
-#      The entrypoint no longer sets it.
-#
-#   2. PGP secrets are now fetched PER DIRECTORY based on the use_pgp flag
-#      in sftp_directories.yaml. Only directories with use_pgp=true get
-#      their PGP key materialised to tmpfs:
-#        /inbound/  (use_pgp=true)  -> /run/secrets/inbound_pgp_private_key.asc
-#        /reports/  (use_pgp=false) -> nothing fetched (no PGP key needed)
-#
-#   3. The Python block reads sftp_directories.yaml directly to know which
-#      directories need PGP secrets — no hardcoding of directory names here.
-#      Adding a new encrypted directory = add YAML block. This file unchanged.
-#
-#   4. Global secrets (SFTP RSA key, host, user) remain as before — one
-#      set shared across all directories (same server, same credentials).
-#
-#   5. PGP_GNUPGHOME env var still used and still set by Composer module.
 
 set -euo pipefail
 

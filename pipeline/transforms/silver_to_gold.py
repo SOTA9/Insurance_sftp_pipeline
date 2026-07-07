@@ -29,7 +29,7 @@ TBL_AGG_REINSURER    = "agg_reinsurer_exposure"
 FACT_TABLES = [TBL_FACT_PREMIUMS, TBL_FACT_CLAIMS, TBL_FACT_REINSURANCE]
 
 
-# GCS / BQ clients
+# GCS & BQ clients
 
 def _bq_client(project: str, sa_key_path: Optional[Path] = None) -> bigquery.Client:
     if sa_key_path:
@@ -98,7 +98,7 @@ def _load_truncate(
     clustering_fields: Optional[list[str]] = None,
     sa_key_path: Optional[Path] = None,
 ) -> None:
-    """WRITE_TRUNCATE — used for dimensions and aggregates."""
+    """WRITE_TRUNCATE : used for dimensions and aggregates."""
     client     = _bq_client(project, sa_key_path)
     table_ref  = f"{project}.{dataset}.{table}"
     job_config = bigquery.LoadJobConfig(
@@ -126,7 +126,7 @@ def _load_fact_incremental(
     Idempotent fact load using DELETE partition + INSERT.
 
     Step 1: DELETE rows where DATE(partition_field) = business_date.
-            Safe on first run (table may not exist yet — exception caught).
+            Safe on first run (table may not exist yet - exception caught).
     Step 2: WRITE_APPEND new rows for this date.
 
     This guarantees: re-running the DAG for the same date never duplicates rows.
@@ -135,7 +135,7 @@ def _load_fact_incremental(
     table_ref = f"{project}.{dataset}.{table}"
     date_str  = business_date.isoformat()
 
-    # Step 1 — delete existing partition (idempotent)
+    # Step 1 : delete existing partition (idempotent)
     delete_sql = f"""
         DELETE FROM `{table_ref}`
         WHERE DATE({partition_field}) = DATE('{date_str}')
@@ -144,10 +144,10 @@ def _load_fact_incremental(
         client.query(delete_sql).result()
         logger.info("[gold] Deleted %s partition %s.", table, date_str)
     except Exception as exc:
-        # Table may not exist yet on first load — that is fine
+        # Table may not exist yet on first load that is fine
         logger.info("[gold] Delete skipped for %s/%s: %s", table, date_str, exc)
 
-    # Step 2 — append new rows
+    # Step 2 : append new rows
     job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         autodetect=True,
@@ -168,8 +168,8 @@ def _load_fact_incremental(
 
 def build_dim_policy(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
     """
-    dim_policy — SCD Type 1 (latest value wins).
-    WRITE_TRUNCATE daily — no GoldState needed.
+    dim_policy : SCD Type 1 (latest value wins).
+    WRITE_TRUNCATE daily : no GoldState needed.
     Matches clustering = ["coverage_type", "status"] in terraform/modules/bigquery/main.tf
     """
     dim = df[[
@@ -184,7 +184,7 @@ def build_dim_policy(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
 
 def build_dim_claimant(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
     """
-    dim_claimant — deduplicated claimant list.
+    dim_claimant : deduplicated claimant list.
     WRITE_TRUNCATE daily.
     """
     dim = df[["policy_id", "claimant_name", "adjuster_id"]].drop_duplicates(
@@ -199,7 +199,7 @@ def build_dim_claimant(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
 
 
 def build_dim_reinsurer(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
-    """dim_reinsurer — one row per reinsurer. WRITE_TRUNCATE daily."""
+    """dim_reinsurer : one row per reinsurer. WRITE_TRUNCATE daily."""
     dim = df[["reinsurer_id", "reinsurer_name"]].drop_duplicates(
         subset=["reinsurer_id"]
     ).copy()
@@ -211,7 +211,7 @@ def build_dim_reinsurer(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
 
 def build_fact_premiums(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
     """
-    fact_premiums — grain: 1 row per premium_id.
+    fact_premiums - grain: 1 row per premium_id.
     PARTITION BY ingestion_date, CLUSTER BY policy_id, status.
     Matches terraform/modules/bigquery/main.tf fact_premiums table.
     """
@@ -230,7 +230,7 @@ def build_fact_premiums(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
 
 def build_fact_claims(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
     """
-    fact_claims — grain: 1 row per claim_id.
+    fact_claims grain: 1 row per claim_id.
     PARTITION BY ingestion_date, CLUSTER BY claim_type, status.
     """
     fact = df[[
@@ -250,7 +250,7 @@ def build_fact_claims(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
 
 def build_fact_reinsurance(df: pd.DataFrame, business_date: date) -> pd.DataFrame:
     """
-    fact_reinsurance — grain: 1 row per ri_record_id.
+    fact_reinsurance  grain: 1 row per ri_record_id.
     PARTITION BY ingestion_date, CLUSTER BY reinsurer_id, treaty_type.
     """
     fact = df[[
@@ -272,8 +272,8 @@ def build_agg_daily_premium_summary(
     df: pd.DataFrame, business_date: date
 ) -> pd.DataFrame:
     """
-    agg_daily_premium_summary — recomputed fresh every run.
-    WRITE_TRUNCATE — no GoldState needed.
+    agg_daily_premium_summary : recomputed fresh every run.
+    WRITE_TRUNCATE : no GoldState needed.
     """
     for col in ["amount_due", "amount_paid"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -299,7 +299,7 @@ def build_agg_daily_premium_summary(
 def build_agg_claim_by_status(
     df: pd.DataFrame, business_date: date
 ) -> pd.DataFrame:
-    """agg_claim_by_status — recomputed fresh, WRITE_TRUNCATE."""
+    """agg_claim_by_status : recomputed fresh, WRITE_TRUNCATE."""
     for col in ["claimed_amount", "approved_amount", "days_to_report"]:
         df[col] = pd.to_numeric(df[col], errors="coerce")
     df["fraud_flag"] = df["fraud_flag"].astype(str).str.lower() == "true"
@@ -358,13 +358,13 @@ def silver_to_gold(
     sa_key_path: Optional[Path] = None,
 ) -> dict[str, str]:
     """
-    Incrementally load all silver entities → BigQuery gold tables
+    Incrementally load all silver entities -> BigQuery gold tables
     for one business_date.
 
-    Dimensions:  WRITE_TRUNCATE daily — always refreshed, no state.
-    Facts:       DELETE partition + INSERT — tracked by GoldState.
+    Dimensions:  WRITE_TRUNCATE daily : always refreshed, no state.
+    Facts:       DELETE partition + INSERT : tracked by GoldState.
                  Skipped if already loaded (unless force_reload=True).
-    Aggregates:  WRITE_TRUNCATE daily — always recomputed, no state.
+    Aggregates:  WRITE_TRUNCATE daily : always recomputed, no state.
 
     force_reload=True: force reload all fact partitions for this date.
     Use when you fix a silver transformer and need to rewrite gold facts.
@@ -395,7 +395,7 @@ def silver_to_gold(
             f"Cannot load gold for {date_str} — silver not ready: {exc}"
         ) from exc
 
-    # Dimensions - WRITE_TRUNCATE, no state
+    # Dimensions : WRITE_TRUNCATE, no state
     dim_configs = [
         (TBL_DIM_POLICY,    build_dim_policy(df_policies, business_date),
          ["coverage_type", "status"]),
@@ -413,7 +413,7 @@ def silver_to_gold(
             logger.error("[gold] Dim load failed %s: %s", table, exc)
             results[table] = f"error: {exc}"
 
-    # Facts - DELETE+INSERT per date, tracked by GoldState
+    # Facts : DELETE+INSERT per date, tracked by GoldState
     fact_configs = [
         (TBL_FACT_PREMIUMS,    build_fact_premiums(df_premiums, business_date),
          "ingestion_date", ["policy_id", "status"]),
@@ -448,7 +448,7 @@ def silver_to_gold(
             logger.error("[gold] Fact load failed %s: %s", table, exc)
             results[table] = f"error: {exc}"
 
-    # Aggregates - WRITE_TRUNCATE, no state
+    # Aggregates : WRITE_TRUNCATE, no state
     agg_configs = [
         (TBL_AGG_PREMIUM,   build_agg_daily_premium_summary(df_premiums, business_date)),
         (TBL_AGG_CLAIMS,    build_agg_claim_by_status(df_claims, business_date)),

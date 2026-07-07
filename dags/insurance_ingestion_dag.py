@@ -60,7 +60,7 @@ def make_directory_group(sftp_dir: SFTPDirectory):
             Returns new_files = sftp_listing minus already_processed.
 
             First run:  state is empty -> new_files = everything on SFTP -> full load.
-            Later runs: new_files = only files not yet in state → incremental.
+            Later runs: new_files = only files not yet in state -> incremental.
             """
             bd = date.fromisoformat(ctx["ds"])
             log_pipeline_banner(ctx["dag"].dag_id, bd)
@@ -146,8 +146,8 @@ def make_directory_group(sftp_dir: SFTPDirectory):
         def decrypt(dl_result: dict) -> dict:
             """
             Calls pgp_handler.process_directory() which handles both cases:
-              use_pgp=True  (/inbound/)  → decrypt .gpg files using company private key
-              use_pgp=False (/reports/)  → copy plain CSV files as-is to decrypt_dir
+              use_pgp=True  (/inbound/)  -> decrypt .gpg files using company private key
+              use_pgp=False (/reports/)  -> copy plain CSV files as-is to decrypt_dir
 
             Output always lands in {download_dir}/decrypted/ as plain .csv files.
             This makes the downstream tasks (checksum, validate, upload) identical
@@ -172,7 +172,7 @@ def make_directory_group(sftp_dir: SFTPDirectory):
         def checksum(dec_result: dict) -> dict:
             """
             use_checksum=True  (/inbound/):  verify SHA-256 of each CSV against sidecar.
-            use_checksum=False (/reports/):  skip entirely — no sidecars provided.
+            use_checksum=False (/reports/):  skip entirely ,no sidecars provided.
             Raises RuntimeError on any mismatch (corrupted or tampered file).
             """
             if dec_result.get("skipped") or not dec_result.get("decrypt_dir"):
@@ -221,10 +221,6 @@ def make_directory_group(sftp_dir: SFTPDirectory):
         def upload_bronze(val_result: dict) -> dict:
             """
             Uploads validated CSVs to GCS bronze prefix.
-
-            GCS paths (from SFTPDirectory.gcs_entity_prefix):
-              bronze/inbound/policies/year=2026/month=05/day=14/policies_20260514.csv
-              bronze/reports/premiums/year=2026/month=05/day=14/premiums_20260514.csv
 
             STATE IS COMMITTED ONLY AFTER SUCCESSFUL UPLOAD.
             If upload fails: files are NOT in state → next DAG run retries them.
@@ -315,7 +311,7 @@ def insurance_ingestion_dag():
 
         Per entity SilverState check:
           Already in state for this date : skip (idempotent).
-          Not in state → run transformer : write Parquet -> mark state.
+          Not in state -> run transformer : write Parquet -> mark state.
 
         First run:  all entities transformed for all available bronze dates.
         Later runs: only entities with new bronze data for this date.
@@ -375,15 +371,15 @@ def insurance_ingestion_dag():
         Loads silver Parquet to BigQuery gold layer.
 
         Facts (fact_premiums, fact_claims, fact_reinsurance):
-          GoldState check: already loaded for this date → skip.
+          GoldState check: already loaded for this date -> skip.
           Not loaded -> DELETE existing partition -> INSERT new rows -> mark state.
           This DELETE+INSERT pattern is idempotent: safe to re-run.
 
         Dimensions (dim_policy, dim_claimant, dim_reinsurer):
-          Always WRITE_TRUNCATE — no state needed, full refresh is fast.
+          Always WRITE_TRUNCATE - no state needed, full refresh is fast.
 
         Aggregates (agg_*):
-          Always WRITE_TRUNCATE — recomputed fresh every run.
+          Always WRITE_TRUNCATE - recomputed fresh every run.
         """
         bd = date.fromisoformat(silver_result["business_date"])
         gold_results = silver_to_gold(

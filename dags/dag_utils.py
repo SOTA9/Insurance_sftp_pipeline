@@ -63,7 +63,6 @@ def on_failure_callback(context: dict) -> None:
     run_id  = context.get("run_id", "unknown")
 
     # Extract dir_id from task_id if this is a directory-level task
-    # e.g. "ingest_inbound.check_inbound" → dir_id = "inbound"
     dir_id = _extract_dir_id_from_task(task_id)
     dir_tag = f" | Dir: `{dir_id}`" if dir_id else ""
 
